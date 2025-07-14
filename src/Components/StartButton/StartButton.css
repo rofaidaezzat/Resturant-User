@@ -1,0 +1,48 @@
+.start-button {
+  font-family: "Lexend Deca", sans-serif;
+  border: none;
+  background-image: linear-gradient(to right, #f97316, #dc2626);
+  color: #ffffff;
+  font-size: 17px;
+  text-transform: capitalize;
+  letter-spacing: 1px;
+  padding: 13px 26px;
+  cursor: pointer;
+  transform: skew(15deg);
+  transition: all 0.4s ease;
+  font-weight: 600;
+}
+
+.main-text-start {
+  display: inline-block;
+  transform: skew(-15deg);
+}
+
+.start-button:hover,
+.start-button.hover-effect {
+  transform: translateY(-3px);
+  border-radius: 26px;
+  animation: pulsate 1s infinite;
+  background-image: linear-gradient(to right, #ea580c, #b91c1c);
+}
+
+.start-button:hover span,
+.start-button.hover-effect span {
+  transform: translateX(2px);
+  transition: all 0.4s ease;
+}
+
+@keyframes pulsate {
+  0% {
+    transform: scale(1);
+    box-shadow: none;
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 16px 16px rgba(0, 0, 0, 0.4);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: none;
+  }
+}

@@ -1,0 +1,64 @@
+.button-continue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 32px;
+ 
+ border: 8px solid #f38334;
+  color: white;
+  gap: 8px;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s;
+  width: 100%;
+  background-image: linear-gradient(to right, #f97316, #dc2626); /* from-orange-500 to-red-600 */
+}
+.text-continue {
+  font-size: 1.7em;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.svg {
+  padding-top: 5px;
+  height: 100%;
+  width: fit-content;
+}
+.svg svg {
+  width: 50px;
+  height: 30px;
+}
+.button-continue:hover {
+  border: 8px solid #b1d8ff;
+  background-image: linear-gradient(to right, #ea580c, #b91c1c); /* from-orange-600 to-red-700 */
+}
+.button-continue:active {
+  border: 5px solid #c0dfff;
+}
+.button-continue:hover .svg svg {
+  animation: jello-vertical 0.9s both;
+  transform-origin: left;
+}
+
+@keyframes jello-vertical {
+  0% {
+    transform: scale3d(1, 1, 1);
+  }
+  30% {
+    transform: scale3d(0.75, 1.25, 1);
+  }
+  40% {
+    transform: scale3d(1.25, 0.75, 1);
+  }
+  50% {
+    transform: scale3d(0.85, 1.15, 1);
+  }
+  65% {
+    transform: scale3d(1.05, 0.95, 1);
+  }
+  75% {
+    transform: scale3d(0.95, 1.05, 1);
+  }
+  100% {
+    transform: scale3d(1, 1, 1);
+  }
+}
