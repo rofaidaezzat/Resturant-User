@@ -1,4 +1,4 @@
-import React, { useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { OrderContext } from "./OrderContext";
 import type { OrderData, OrderItem } from "./types";
 
