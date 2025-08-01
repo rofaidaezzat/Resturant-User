@@ -1,10 +1,8 @@
 import { useState } from "react";
-
 import { useNavigate } from "react-router-dom";
 import { Truck, UtensilsCrossed, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useOrder } from "../contexts/useOrder";
-
 import { Button } from "../Components/UI/Button";
 import { Input } from "../Components/UI/Input";
 import { Label } from "../Components/UI/label";
@@ -15,14 +13,20 @@ import BackButton from "../Components/BackButton/BackButton";
 
 const OrderType = () => {
   const navigate = useNavigate();
-  const { order, updateOrderType, updateDeliveryInfo, updateTableNumber } =
-    useOrder();
+  const {
+    order,
+    updateOrderType,
+    updateDeliveryInfo,
+    updateTableNumber,
+    updateOrder,
+  } = useOrder();
   const t = useTranslation(order.language);
 
   const [selectedType, setSelectedType] = useState<
     "delivery" | "dine-in" | "chatbot" | null
   >(order.type);
   const [address, setAddress] = useState(order.address || "");
+  const [customerName, setcustomerName] = useState(order.customerName || "");
   const [phone, setPhone] = useState(order.phone || "");
   const [tableNumber, setTableNumber] = useState(order.tableNumber || "");
 
@@ -30,47 +34,63 @@ const OrderType = () => {
     setSelectedType(type);
     updateOrderType(type);
   };
-  const handleBack = () => {
-    navigate("/");
-  };
+  // Mutation for submitting the order
+  // This will handle the API call to submit the order
+
   const handleContinue = () => {
     if (!selectedType) {
       toast.error("Please select an order type");
       return;
     }
-    // ✅ استخدمي validateForm هنا
-    if (!validateForm()) {
+
+    // ✅ تخطي الفاليديشن لو كان النوع "chatbot"
+    if (selectedType !== "chatbot" && !validateForm()) {
       toast.error("Please correct the form errors.");
       return;
     }
 
     if (selectedType === "delivery") {
-      if (!address.trim() || !phone.trim()) {
-        toast.error("Please fill in all required fields");
-        return;
-      }
       updateDeliveryInfo(address.trim(), phone.trim());
-      navigate("/menu");
     } else if (selectedType === "dine-in") {
-      if (tableNumber.trim()) {
-        updateTableNumber(tableNumber.trim());
-      }
-      navigate("/menu");
-    } else if (selectedType === "chatbot") {
+      updateTableNumber(tableNumber.trim());
+    }
+
+    updateOrder({
+      ...order,
+      customerName: customerName.trim(),
+    });
+
+    updateOrderType(selectedType);
+
+    if (selectedType === "chatbot") {
       navigate("/chatbot");
+    } else {
+      // ✅ إضافة التنقل لباقي الأنواع
+      navigate("/menu");
     }
   };
+
+  // 📝 Form Validation
   const [errors, setErrors] = useState<{
+    name?: string;
     address?: string;
     phone?: string;
     tableNumber?: string;
   }>({});
   const validateForm = (): boolean => {
     const newErrors: {
+      name?: string;
       address?: string;
       phone?: string;
       tableNumber?: string;
     } = {};
+
+    // 🧍‍♀️ Name Validation (applies to both delivery and dine-in)
+    if (!customerName.trim()) {
+      newErrors.name = "Name is required.";
+    } else if (customerName.trim().length < 2) {
+      newErrors.name = "Name must be at least 2 characters long.";
+    }
 
     // 📦 Delivery Validation
     if (selectedType === "delivery") {
@@ -99,6 +119,10 @@ const OrderType = () => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+  // go back
+  const handleBack = () => {
+    navigate("/");
   };
 
   return (
@@ -215,6 +239,23 @@ const OrderType = () => {
         {selectedType === "delivery" && (
           <form className="space-y-4 mb-8">
             <div>
+              <Label htmlFor="name" className="text-gray-700 font-medium">
+                {t.name} *
+              </Label>
+              <Input
+                id="name"
+                type="text"
+                value={customerName}
+                onChange={(e) => setcustomerName(e.target.value)}
+                placeholder="Enter your name"
+                className="mt-1"
+                required
+              />
+              {errors.name && (
+                <p className="text-red-500 text-sm">{errors.name}</p>
+              )}
+            </div>
+            <div>
               <Label htmlFor="address" className="text-gray-700 font-medium">
                 {t.deliveryAddress} *
               </Label>
@@ -253,6 +294,23 @@ const OrderType = () => {
 
         {selectedType === "dine-in" && (
           <form className="space-y-4 mb-8">
+            <div>
+              <Label htmlFor="name" className="text-gray-700 font-medium">
+                {t.name} *
+              </Label>
+              <Input
+                id="name"
+                type="text"
+                value={customerName}
+                onChange={(e) => setcustomerName(e.target.value)}
+                placeholder="Enter your name"
+                className="mt-1"
+                required
+              />
+              {errors.name && (
+                <p className="text-red-500 text-sm">{errors.name}</p>
+              )}
+            </div>
             <div>
               <Label htmlFor="table" className="text-gray-700 font-medium">
                 {t.tableNumber}

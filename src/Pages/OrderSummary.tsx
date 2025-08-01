@@ -22,8 +22,11 @@ import {
   CardTitle,
 } from "../Components/UI/card";
 import BackButton from "../Components/BackButton/BackButton";
+import { axiosInstance } from "../config/axios.config";
 
 const OrderSummary = () => {
+  const { updateOrderID } = useOrder();
+
   const navigate = useNavigate();
   const { order, updateItemQuantity, removeItem } = useOrder();
   const t = useTranslation(order.language);
@@ -42,26 +45,22 @@ const OrderSummary = () => {
     }
   };
 
-  const handleRemoveItem = (itemId: string) => {
-    removeItem(itemId);
-    toast.success("Item removed from order");
-  };
-
   const handleConfirmOrder = async () => {
     setIsSubmitting(true);
 
     try {
-      // Prepare order data for webhook
       const orderData = {
         timestamp: new Date().toISOString(),
         orderType: order.type,
         customerInfo: {
           ...(order.type === "delivery" && {
+            customerName: order.customerName,
             address: order.address,
             phone: order.phone,
           }),
           ...(order.type === "dine-in" &&
             order.tableNumber && {
+              customerName: order.customerName,
               tableNumber: order.tableNumber,
             }),
         },
@@ -72,9 +71,11 @@ const OrderSummary = () => {
 
       console.log("Order submitted:", orderData);
 
-      // Here you would typically send to your webhook/API
-      // For demo purposes, we'll simulate a successful submission
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // ✅ إرسال الطلب إلى الـ API
+      const response = await axiosInstance.post("webhook/new-order", orderData);
+
+      // ✅ تخزين الـ order_ID
+      updateOrderID(response.data.order_ID);
 
       toast.success("Order confirmed successfully!");
       navigate("/thank-you");
@@ -85,7 +86,6 @@ const OrderSummary = () => {
       setIsSubmitting(false);
     }
   };
-
   if (order.items.length === 0) {
     return (
       <div
@@ -187,7 +187,7 @@ const OrderSummary = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveItem(`${item.id}-${index}`)}
+                        onClick={() => removeItem(item.id, item.notes)}
                         className="text-red-500 hover:text-red-700"
                       >
                         <Trash2 className="w-4 h-4" />

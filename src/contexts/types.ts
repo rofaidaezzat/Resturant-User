@@ -9,6 +9,8 @@ export interface OrderItem {
 }
 
 export interface OrderData {
+  order_ID?: string; // ➕ ده اللي ضفناه
+  customerName?: string;
   type: 'delivery' | 'dine-in' | 'chatbot' | null;
   address?: string;
   phone?: string;
@@ -24,8 +26,13 @@ export interface OrderContextType {
   updateDeliveryInfo: (address: string, phone: string) => void;
   updateTableNumber: (tableNumber: string) => void;
   addItem: (item: Omit<OrderItem, 'quantity'>, quantity: number, notes?: string) => void;
-  removeItem: (id: string) => void;
+  removeItem: (id: string, notes?: string) => void;
   updateItemQuantity: (id: string, quantity: number) => void;
   clearOrder: () => void;
   setLanguage: (lang: 'en' | 'ar') => void;
+  updateOrderID: (id: string) => void; // ➕ أضف دي هنا
+  updateOrder: (updatedOrder: Partial<OrderData>) => void; // ➕ أضف دي هنا
+  
+
 }
+

@@ -9,6 +9,18 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     total: 0,
     language: "en",
   });
+  const updateOrderID = (id: string) => {
+    setOrder((prev) => ({
+      ...prev,
+      order_ID: id,
+    }));
+  };
+  const updateOrder = (updatedOrder: Partial<OrderData>) => {
+    setOrder((prev) => ({
+      ...prev,
+      ...updatedOrder,
+    }));
+  };
 
   const updateOrderType = (type: "delivery" | "dine-in" | "chatbot") => {
     setOrder((prev: OrderData) => ({ ...prev, type }));
@@ -50,9 +62,11 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const removeItem = (id: string) => {
+  const removeItem = (id: string, notes?: string) => {
     setOrder((prev: OrderData) => {
-      const newItems = prev.items.filter((item) => item.id !== id);
+      const newItems = prev.items.filter(
+        (item) => !(item.id === id && item.notes === notes)
+      );
       const total = newItems.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0
@@ -110,6 +124,8 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         updateItemQuantity,
         clearOrder,
         setLanguage,
+        updateOrderID,
+        updateOrder, // ✅ أضف دي هنا
       }}
     >
       {children}

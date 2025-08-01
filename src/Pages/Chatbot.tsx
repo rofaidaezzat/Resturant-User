@@ -5,7 +5,8 @@ import { useOrder } from "../contexts/useOrder";
 import { Button } from "../Components/UI/Button";
 import { Input } from "../Components/UI/Input";
 import { useTranslation } from "../utils/translations";
-
+import { axiosInstance } from "../config/axios.config";
+import { v4 as uuidv4 } from "uuid"; // لإنتاج sessionId فريد
 interface Message {
   id: string;
   text: string;
@@ -28,6 +29,7 @@ const Chatbot = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef(uuidv4()); // 🔐 يبقى ثابت طول الجلسة
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -41,45 +43,64 @@ const Chatbot = () => {
     navigate("/order-type");
   };
 
-  const simulateBotResponse = (userMessage: string) => {
+  const simulateBotResponse = async (userMessage: string) => {
     setIsTyping(true);
 
-    setTimeout(() => {
-      let botResponse = "I'd be happy to help you with your order! ";
+    try {
+      // Try using the same payload structure as the working code
+      const response = await axiosInstance.post("webhook/chatbot", {
+        message: userMessage,
+        timestamp: new Date().toISOString(), // Instead of sessionId
+        sessionId: sessionIdRef.current, // ✅ ثابت من أول الشات,
+      });
 
-      if (userMessage.toLowerCase().includes("menu")) {
-        botResponse +=
-          "Would you like me to show you our menu? We have burgers, salads, pizza, seafood, and desserts.";
-      } else if (userMessage.toLowerCase().includes("burger")) {
-        botResponse +=
-          "Great choice! Our Classic Burger is very popular - it's a juicy beef patty with lettuce, tomato, onion, and our special sauce for $25.";
-      } else if (userMessage.toLowerCase().includes("pizza")) {
-        botResponse +=
-          "Our Margherita Pizza is delicious! Fresh mozzarella, tomato sauce, and basil on thin crust for $28.";
-      } else if (
-        userMessage.toLowerCase().includes("price") ||
-        userMessage.toLowerCase().includes("cost")
-      ) {
-        botResponse +=
-          "Our menu items range from $8 for beverages to $35 for our premium dishes. Would you like to see the full menu?";
-      } else if (userMessage.toLowerCase().includes("delivery")) {
-        botResponse +=
-          "Yes, we offer delivery! If you'd like to place an order for delivery, I can help you with that.";
+      console.log("Full bot response:", response.data);
+
+      // Handle different response structures
+      let botText;
+
+      if (typeof response.data === "string") {
+        // Plain text response (like first code)
+        botText = response.data;
+      } else if (response.data?.[0]?.output) {
+        // Array with output property
+        botText = response.data[0].output;
+      } else if (response.data?.output) {
+        // Direct output property
+        botText = response.data.output;
+      } else if (response.data?.message) {
+        // Message property
+        botText = response.data.message;
       } else {
-        botResponse +=
-          "Let me help you find something delicious. Are you looking for something specific, or would you like me to recommend some popular items?";
+        // Fallback - try to stringify if it's an object
+        botText =
+          typeof response.data === "object"
+            ? JSON.stringify(response.data)
+            : "Sorry, no response from server.";
       }
 
       const newBotMessage: Message = {
         id: Date.now().toString(),
-        text: botResponse,
+        text: botText,
         sender: "bot",
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, newBotMessage]);
+    } catch (error) {
+      console.error("Bot error:", error);
+      console.error("Error details:", error.response?.data);
+
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        text: "An error occurred while getting a response.",
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
+    }
   };
 
   const handleSendMessage = () => {

@@ -84,8 +84,18 @@ const ThankYou = () => {
               </div>
               <div className="flex justify-between">
                 <span>Items:</span>
-                <span className="font-medium">{order.items.length}</span>
+                <div className="text-left space-y-1">
+                  {order.items.map((item, index) => (
+                    <div key={index} className="flex justify-between">
+                      <span className="font-medium">{item.name}</span>
+                      <span className="text-gray-600 font-medium">
+                        Quantity: {item.quantity}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
+
               <div className="flex justify-between text-lg font-bold text-orange-600 pt-2 border-t">
                 <span>{t.total}:</span>
                 <span>
