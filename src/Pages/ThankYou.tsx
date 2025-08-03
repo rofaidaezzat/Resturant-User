@@ -1,7 +1,4 @@
-import { useEffect, useState } from "react";
-
 import { useNavigate } from "react-router-dom";
-
 import { CheckCircle, Clock, Home } from "lucide-react";
 import { Button } from "../Components/UI/Button";
 import { useTranslation } from "../utils/translations";
@@ -12,18 +9,6 @@ const ThankYou = () => {
   const navigate = useNavigate();
   const { order, clearOrder } = useOrder();
   const t = useTranslation(order.language);
-  const [orderNumber] = useState(() =>
-    Math.random().toString(36).substr(2, 8).toUpperCase()
-  );
-
-  useEffect(() => {
-    // Auto redirect after 30 seconds
-    const timer = setTimeout(() => {
-      handleNewOrder();
-    }, 30000);
-
-    return () => clearTimeout(timer);
-  }, []);
 
   const handleNewOrder = () => {
     clearOrder();
@@ -57,7 +42,7 @@ const ThankYou = () => {
               </h3>
               <div className="bg-gray-100 px-4 py-2 rounded-lg inline-block">
                 <span className="text-2xl font-mono font-bold text-orange-600">
-                  #{orderNumber}
+                  #{order.order_ID}
                 </span>
               </div>
             </div>
