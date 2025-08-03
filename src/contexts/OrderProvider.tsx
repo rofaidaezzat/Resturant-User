@@ -116,6 +116,8 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     <OrderContext.Provider
       value={{
         order,
+        setOrder,
+
         updateOrderType,
         updateDeliveryInfo,
         updateTableNumber,

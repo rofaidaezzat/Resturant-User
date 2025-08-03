@@ -20,8 +20,10 @@ export interface OrderData {
   language: 'en' | 'ar';
 }
 
+
 export interface OrderContextType {
   order: OrderData;
+  setOrder: (order: OrderData) => void;
   updateOrderType: (type: 'delivery' | 'dine-in' | 'chatbot') => void;
   updateDeliveryInfo: (address: string, phone: string) => void;
   updateTableNumber: (tableNumber: string) => void;

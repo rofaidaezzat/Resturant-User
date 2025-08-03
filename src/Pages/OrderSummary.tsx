@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { useNavigate } from "react-router-dom";
 
@@ -25,12 +25,48 @@ import BackButton from "../Components/BackButton/BackButton";
 import { axiosInstance } from "../config/axios.config";
 
 const OrderSummary = () => {
-  const { updateOrderID } = useOrder();
+  const { updateOrderID, setOrder } = useOrder();
 
   const navigate = useNavigate();
   const { order, updateItemQuantity, removeItem } = useOrder();
   const t = useTranslation(order.language);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Save order to sessionStorage whenever order changes
+  useEffect(() => {
+    if (order && order.items && order.items.length > 0) {
+      sessionStorage.setItem("currentOrder", JSON.stringify(order));
+    }
+  }, [order]);
+
+  // Load order from sessionStorage on component mount
+  useEffect(() => {
+    const loadOrderFromStorage = () => {
+      try {
+        const savedOrder = sessionStorage.getItem("currentOrder");
+        if (
+          savedOrder &&
+          (!order || !order.items || order.items.length === 0)
+        ) {
+          const parsedOrder = JSON.parse(savedOrder);
+          if (
+            parsedOrder &&
+            parsedOrder.items &&
+            parsedOrder.items.length > 0
+          ) {
+            setOrder(parsedOrder);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading order from storage:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadOrderFromStorage();
+  }, [setOrder]);
 
   const handleBack = () => {
     navigate("/menu");
@@ -51,6 +87,7 @@ const OrderSummary = () => {
     try {
       const orderData = {
         timestamp: new Date().toISOString(),
+        order_ID: order.order_ID,
         orderType: order.type,
         customerInfo: {
           ...(order.type === "delivery" && {
@@ -77,6 +114,9 @@ const OrderSummary = () => {
       // ✅ تخزين الـ order_ID
       updateOrderID(response.data.order_ID);
 
+      // Clear order from sessionStorage after successful submission
+      sessionStorage.removeItem("currentOrder");
+
       toast.success("Order confirmed successfully!");
       navigate("/thank-you");
     } catch (error) {
@@ -86,11 +126,28 @@ const OrderSummary = () => {
       setIsSubmitting(false);
     }
   };
-  if (order.items.length === 0) {
+
+  // Show loading while checking for saved order
+  if (isLoading) {
     return (
       <div
         className={`min-h-screen bg-gray-50 flex items-center justify-center ${
-          order.language === "ar" ? "rtl" : "ltr"
+          order?.language === "ar" ? "rtl" : "ltr"
+        }`}
+      >
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your order...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!order || !order.items || order.items.length === 0) {
+    return (
+      <div
+        className={`min-h-screen bg-gray-50 flex items-center justify-center ${
+          order?.language === "ar" ? "rtl" : "ltr"
         }`}
       >
         <div className="text-center">
