@@ -25,10 +25,8 @@ import BackButton from "../Components/BackButton/BackButton";
 import { axiosInstance } from "../config/axios.config";
 
 const OrderSummary = () => {
-  const { updateOrderID, setOrder } = useOrder();
-
   const navigate = useNavigate();
-  const { order, updateItemQuantity, removeItem } = useOrder();
+  const { order, updateItemQuantity, removeItem, setOrder } = useOrder(); // Added setOrder
   const t = useTranslation(order.language);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,7 +85,6 @@ const OrderSummary = () => {
     try {
       const orderData = {
         timestamp: new Date().toISOString(),
-        order_ID: order.order_ID,
         orderType: order.type,
         customerInfo: {
           ...(order.type === "delivery" && {
@@ -106,21 +103,55 @@ const OrderSummary = () => {
         language: order.language,
       };
 
-      console.log("Order submitted:", orderData);
+      console.log("Submitting order:", orderData);
 
-      // ✅ إرسال الطلب إلى الـ API
+      // Send order to API
       const response = await axiosInstance.post("webhook/new-order", orderData);
 
-      // ✅ تخزين الـ order_ID
-      updateOrderID(response.data.order_ID);
+      console.log("Full API Response:", response);
+      console.log("Response data:", response.data);
 
-      // Clear order from sessionStorage after successful submission
-      sessionStorage.removeItem("currentOrder");
+      // Check if the response has the expected structure
+      if (response.data && response.data.success && response.data.payload) {
+        const apiOrderId = response.data.payload.order_ID;
+        console.log("Extracted order_ID:", apiOrderId);
 
-      toast.success("Order confirmed successfully!");
-      navigate("/thank-you");
+        if (apiOrderId) {
+          // Update the order context with the order_ID from API response
+          const updatedOrder = {
+            ...order,
+            order_ID: apiOrderId,
+            status: response.data.payload.status || "processing",
+            timestamp: orderData.timestamp,
+          };
+
+          console.log("Updated order with ID:", updatedOrder);
+
+          // Update the order context
+          setOrder(updatedOrder);
+
+          // Clear order from sessionStorage after successful submission
+          sessionStorage.removeItem("currentOrder");
+
+          toast.success("Order confirmed successfully!");
+          console.log(
+            "Navigating to thank-you page with order ID:",
+            apiOrderId
+          );
+          navigate("/thank-you");
+        } else {
+          console.error("No order_ID in API response payload");
+          toast.error(
+            "Order submitted but no ID received. Please contact support."
+          );
+        }
+      } else {
+        console.error("Unexpected API response structure:", response.data);
+        toast.error("Order submission failed. Please try again.");
+      }
     } catch (error) {
       console.error("Error submitting order:", error);
+      console.error("Error response:", error.response?.data);
       toast.error("Failed to submit order. Please try again.");
     } finally {
       setIsSubmitting(false);
