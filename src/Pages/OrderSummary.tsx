@@ -151,7 +151,7 @@ const OrderSummary = () => {
       }
     } catch (error) {
       console.error("Error submitting order:", error);
-      console.error("Error response:", error.response?.data);
+
       toast.error("Failed to submit order. Please try again.");
     } finally {
       setIsSubmitting(false);
