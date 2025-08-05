@@ -73,13 +73,6 @@ const ThankYou = () => {
       }
     } catch (error) {
       console.error("Error fetching order status:", error);
-      console.error("Error details:", error.response?.data);
-      console.error("Error status:", error.response?.status);
-      setStatusError(
-        `Failed to fetch order status: ${
-          error.response?.status || "Network error"
-        }`
-      );
     } finally {
       setStatusLoading(false);
     }
