@@ -13,14 +13,14 @@ import { useTranslation } from "../utils/translations";
 import { Card, CardContent } from "../Components/UI/card";
 import { useOrder } from "../contexts/useOrder";
 import { axiosInstance } from "../config/axios.config";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Define the order status type
 interface OrderStatus {
   status: string;
   orderId?: string;
   updatedAt?: string;
-  // Add other properties that might come from your API
+  order_ID?: string;
 }
 
 const ThankYou = () => {
@@ -30,64 +30,184 @@ const ThankYou = () => {
 
   // State for order status tracking with proper typing
   const [orderStatus, setOrderStatus] = useState<OrderStatus | null>(null);
-  const [statusLoading, setStatusLoading] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(false); // تغيير initial value لـ false
   const [statusError, setStatusError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Function to fetch order status
   const fetchOrderStatus = async () => {
-    // Debug logging
-    console.log("Full Order object:", order);
-    console.log("Order ID value:", order.order_ID);
-    console.log("Order ID type:", typeof order.order_ID);
-    console.log("Order ID exists:", !!order.order_ID);
-    console.log("Order items:", order.items);
-    console.log("Order total:", order.total);
+    console.log("=== fetchOrderStatus Function Called ===");
 
-    if (!order.order_ID || order.order_ID.trim() === "") {
-      console.log("Order ID is missing, empty, or falsy");
-      setStatusError(
-        "Order ID not available - order may not have been submitted properly"
-      );
-      setStatusLoading(false);
+    // التحقق من وجود order_ID
+    if (!order?.order_ID) {
+      console.log("❌ No order ID available in fetchOrderStatus");
+      setStatusError("Order ID not available");
       return;
     }
 
-    try {
-      console.log("Attempting to fetch status for order ID:", order.order_ID);
-      const response = await axiosInstance.get(
-        `webhook/get-status?orderId=${order.order_ID}`
-      );
-      console.log("API Response:", response);
-      console.log("Response data:", response.data);
-      console.log("Response status:", response.status);
+    // تنظيف order_ID من المسافات
+    const cleanOrderId = order.order_ID.toString().trim();
+    console.log("Clean Order ID:", cleanOrderId);
 
-      if (response.data && response.data.length > 0) {
-        console.log("Order status found:", response.data[0]);
-        setOrderStatus(response.data[0] as OrderStatus);
-        setStatusError(null);
-        setLastUpdated(new Date());
+    if (!cleanOrderId) {
+      console.log("❌ Order ID is empty after trimming");
+      setStatusError("Order ID is empty");
+      return;
+    }
+
+    // فحص axiosInstance
+    console.log("Axios instance:", axiosInstance);
+    console.log("Axios base URL:", axiosInstance.defaults.baseURL);
+
+    try {
+      setStatusLoading(true);
+      setStatusError(null);
+
+      console.log("🚀 Making API request...");
+      console.log(
+        "Request URL:",
+        `/webhook/get-status?orderId=${encodeURIComponent(cleanOrderId)}`
+      );
+      console.log(
+        "Full URL will be:",
+        `${
+          axiosInstance.defaults.baseURL
+        }/webhook/get-status?orderId=${encodeURIComponent(cleanOrderId)}`
+      );
+
+      // محاولة الـ request مع تسجيل تفصيلي
+      console.log("⏳ Sending request...");
+
+      const response = await axiosInstance.get(
+        `/webhook/get-status?orderId=${encodeURIComponent(cleanOrderId)}`
+      );
+
+      console.log("✅ Request completed successfully!");
+      console.log("Response status:", response.status);
+      console.log("Response headers:", response.headers);
+      console.log("Response data:", response.data);
+
+      // التحقق من الاستجابة
+      if (response.status === 200 && response.data) {
+        // إذا كان response.data array
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          console.log("📦 Array response with data:", response.data[0]);
+          setOrderStatus(response.data[0] as OrderStatus);
+          setLastUpdated(new Date());
+        }
+        // إذا كان response.data object
+        else if (
+          !Array.isArray(response.data) &&
+          typeof response.data === "object"
+        ) {
+          console.log("📦 Object response:", response.data);
+          setOrderStatus(response.data as OrderStatus);
+          setLastUpdated(new Date());
+        } else {
+          console.log("⚠️ No valid data in response");
+          setStatusError("Order not found");
+        }
       } else {
-        console.log("No order data returned from API");
-        setStatusError("Order not found in system");
+        console.log("❌ Invalid response status or no data");
+        setStatusError("Failed to fetch order status");
       }
-    } catch (error) {
-      console.error("Error fetching order status:", error);
+    } catch (error: any) {
+      console.log("=== API Request Error ===");
+      console.error("Full error object:", error);
+
+      if (error.response) {
+        console.error("❌ Server responded with error:");
+        console.error("Status:", error.response.status);
+        console.error("Headers:", error.response.headers);
+        console.error("Data:", error.response.data);
+
+        switch (error.response.status) {
+          case 404:
+            setStatusError("Order not found");
+            break;
+          case 500:
+            setStatusError("Server error - please try again later");
+            break;
+          case 400:
+            setStatusError("Invalid order ID");
+            break;
+          default:
+            setStatusError(`Server error: ${error.response.status}`);
+        }
+      } else if (error.request) {
+        console.error("❌ Network error - request was made but no response:");
+        console.error("Request object:", error.request);
+        console.error("Request readyState:", error.request.readyState);
+        console.error("Request status:", error.request.status);
+        setStatusError("Network error - check your connection");
+      } else {
+        console.error("❌ Error setting up request:");
+        console.error("Error message:", error.message);
+        setStatusError("Failed to fetch order status");
+      }
     } finally {
       setStatusLoading(false);
+      console.log("🏁 fetchOrderStatus completed");
     }
   };
 
-  // Auto-refresh status every 30 seconds
-  // useEffect(() => {
-  //   fetchOrderStatus();
-  //   const interval = setInterval(fetchOrderStatus, 30000);
-  //   return () => clearInterval(interval);
-  // }, [order.order_ID]);
+  // useEffect للـ initial load والـ polling
+  useEffect(() => {
+    console.log("=== ThankYou Component useEffect Triggered ===");
+    console.log("Full order object:", order);
+    console.log("order.order_ID value:", order?.order_ID);
+    console.log("order.order_ID type:", typeof order?.order_ID);
+    console.log("order.order_ID exists:", !!order?.order_ID);
+
+    // فحص شامل للـ order object
+    if (!order) {
+      console.log("❌ No order object found");
+      setStatusError("No order data available");
+      return;
+    }
+
+    if (!order.order_ID) {
+      console.log("❌ No order_ID in order object");
+      console.log("Available order keys:", Object.keys(order));
+      setStatusError("Order ID missing from order data");
+      return;
+    }
+
+    const cleanOrderId = order.order_ID.toString().trim();
+    console.log("Cleaned order ID:", cleanOrderId);
+
+    if (!cleanOrderId) {
+      console.log("❌ Order ID is empty after cleaning");
+      setStatusError("Order ID is empty");
+      return;
+    }
+
+    console.log("✅ Order ID validation passed, calling fetchOrderStatus");
+
+    // أول استدعاء مع timeout للتأكد
+    setTimeout(() => {
+      console.log("🚀 Initiating first fetchOrderStatus call");
+      fetchOrderStatus();
+    }, 100);
+
+    // إعداد polling كل 30 ثانية
+    const interval = setInterval(() => {
+      console.log("⏰ Polling interval triggered");
+      fetchOrderStatus();
+    }, 30000);
+
+    // تنظيف interval عند unmount أو تغيير order_ID
+    return () => {
+      console.log("🧹 Cleaning up polling interval");
+      clearInterval(interval);
+    };
+  }, [order?.order_ID]);
 
   // Get status display info
   const getStatusInfo = (status: string) => {
-    switch (status?.toLowerCase()) {
+    const normalizedStatus = status?.toLowerCase() || "";
+
+    switch (normalizedStatus) {
       case "processing":
         return {
           icon: <Clock className="w-5 h-5 text-amber-600" />,
@@ -96,8 +216,10 @@ const ThankYou = () => {
           color: "text-amber-600",
           bgColor: "bg-amber-50",
           borderColor: "border-amber-200",
+          progress: "25%",
         };
       case "preparing":
+      case "pre":
         return {
           icon: <ChefHat className="w-5 h-5 text-blue-600" />,
           text: "Preparing",
@@ -105,6 +227,7 @@ const ThankYou = () => {
           color: "text-blue-600",
           bgColor: "bg-blue-50",
           borderColor: "border-blue-200",
+          progress: "50%",
         };
       case "ready":
         return {
@@ -117,6 +240,7 @@ const ThankYou = () => {
           color: "text-green-600",
           bgColor: "bg-green-50",
           borderColor: "border-green-200",
+          progress: "75%",
         };
       case "completed":
         return {
@@ -129,15 +253,17 @@ const ThankYou = () => {
           color: "text-emerald-600",
           bgColor: "bg-emerald-50",
           borderColor: "border-emerald-200",
+          progress: "100%",
         };
       default:
         return {
           icon: <Clock className="w-5 h-5 text-gray-600" />,
-          text: "Processing",
-          description: "Your order is being processed",
+          text: "Unknown Status",
+          description: "Checking order status...",
           color: "text-gray-600",
           bgColor: "bg-gray-50",
           borderColor: "border-gray-200",
+          progress: "0%",
         };
     }
   };
@@ -148,7 +274,7 @@ const ThankYou = () => {
   };
 
   const handleRefreshStatus = () => {
-    setStatusLoading(true);
+    console.log("Manual refresh triggered");
     fetchOrderStatus();
   };
 
@@ -190,11 +316,7 @@ const ThankYou = () => {
 
             {/* Order Status Tracking */}
             <div
-              className="mt-6 p-4 rounded-xl border-2 transition-all duration-300"
-              style={{
-                backgroundColor: statusInfo.bgColor,
-                borderColor: statusInfo.borderColor,
-              }}
+              className={`mt-6 p-4 rounded-xl border-2 transition-all duration-300 ${statusInfo.bgColor} ${statusInfo.borderColor}`}
             >
               <div className="flex items-center justify-center space-x-3 mb-3">
                 {statusLoading ? (
@@ -204,12 +326,20 @@ const ThankYou = () => {
                 ) : (
                   statusInfo.icon
                 )}
-                <h4 className={`font-bold text-lg ${statusInfo.color}`}>
+                <h4
+                  className={`font-bold text-lg ${
+                    statusError ? "text-red-600" : statusInfo.color
+                  }`}
+                >
                   {statusError ? "Error" : statusInfo.text}
                 </h4>
               </div>
 
-              <p className={`text-sm ${statusInfo.color} opacity-80 mb-3`}>
+              <p
+                className={`text-sm mb-3 ${
+                  statusError ? "text-red-600" : statusInfo.color
+                } opacity-80`}
+              >
                 {statusError || statusInfo.description}
               </p>
 
@@ -217,27 +347,29 @@ const ThankYou = () => {
               {!statusError && orderStatus && (
                 <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
                   <div
-                    className={`h-2 rounded-full transition-all duration-500 ${
-                      orderStatus.status === "processing"
-                        ? "bg-amber-500 w-1/4"
-                        : orderStatus.status === "preparing"
-                        ? "bg-blue-500 w-2/4"
-                        : orderStatus.status === "ready"
-                        ? "bg-green-500 w-3/4"
-                        : orderStatus.status === "completed"
-                        ? "bg-emerald-500 w-full"
-                        : "bg-gray-400 w-1/4"
-                    }`}
+                    className={`h-2 rounded-full transition-all duration-500`}
+                    style={{
+                      width: statusInfo.progress,
+                      backgroundColor: statusInfo.color.includes("amber")
+                        ? "#f59e0b"
+                        : statusInfo.color.includes("blue")
+                        ? "#3b82f6"
+                        : statusInfo.color.includes("green")
+                        ? "#10b981"
+                        : statusInfo.color.includes("emerald")
+                        ? "#059669"
+                        : "#6b7280",
+                    }}
                   ></div>
                 </div>
               )}
 
               {/* Refresh Button and Last Updated */}
-              <div className="flex items-center justify-between text-xs text-gray-600">
+              <div className="flex items-center justify-between text-xs text-gray-600 mt-3">
                 <button
                   onClick={handleRefreshStatus}
                   disabled={statusLoading}
-                  className="flex items-center space-x-1 hover:text-gray-800 transition-colors disabled:opacity-50"
+                  className="flex items-center space-x-1 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Loader2
                     className={`w-3 h-3 ${statusLoading ? "animate-spin" : ""}`}
@@ -273,14 +405,14 @@ const ThankYou = () => {
               <div className="flex justify-between">
                 <span>Items:</span>
                 <div className="text-left space-y-1">
-                  {order.items.map((item, index) => (
+                  {order.items?.map((item, index) => (
                     <div key={index} className="flex justify-between">
                       <span className="font-medium">{item.name}</span>
                       <span className="text-gray-600 font-medium">
                         Quantity: {item.quantity}
                       </span>
                     </div>
-                  ))}
+                  )) || <span>No items</span>}
                 </div>
               </div>
 
@@ -288,7 +420,7 @@ const ThankYou = () => {
                 <span>{t.total}:</span>
                 <span>
                   {t.price}
-                  {order.total.toFixed(2)}
+                  {order.total?.toFixed(2) || "0.00"}
                 </span>
               </div>
             </div>
