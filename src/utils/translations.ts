@@ -1,4 +1,3 @@
-
 export const translations = {
   en: {
     // Landing Page
@@ -47,10 +46,11 @@ export const translations = {
     loading: "Loading...",
     error: "Error occurred",
     required: "This field is required",
+    retry: "Try Again",
+    noMenuItems: "No menu items available",
 
-
-     // Categories
-      categories: {
+    // Categories
+    categories: {
       All: "All",
       Burgers: "Burgers",
       Pizza: "Pizza",
@@ -58,8 +58,11 @@ export const translations = {
       Seafood: "Seafood",
       Desserts: "Desserts",
       Beverages: "Beverages",
-       },
-    
+      Sandwiches: "Sandwiches",
+      "Main Course": "Main Course",
+      Appetizers: "Appetizers",
+      Drinks: "Drinks",
+    },
   },
   ar: {
     // Landing Page
@@ -108,18 +111,23 @@ export const translations = {
     loading: "جاري التحميل...",
     error: "حدث خطأ",
     required: "هذا الحقل مطلوب",
+    retry: "حاول مرة أخرى",
+    noMenuItems: "لا توجد عناصر في القائمة",
 
-// Categories
-       categories: {
+    // Categories
+    categories: {
       All: "الكل",
-      Burgers: "ساندويتش",
+      Burgers: "برجر",
       Pizza: "بيتزا",
-      Salads: "سلطة",
+      Salads: "سلطات",
       Seafood: "مأكولات بحرية",
       Desserts: "حلويات",
       Beverages: "مشروبات",
-       },
-    
+      Sandwiches: "ساندويتش",
+      "Main Course": "الطبق الرئيسي",
+      Appetizers: "مقبلات",
+      Drinks: "مشروبات",
+    },
   }
 };
 

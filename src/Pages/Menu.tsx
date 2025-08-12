@@ -1,9 +1,8 @@
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-import { Plus, Minus, ShoppingCart } from "lucide-react";
+import { Plus, Minus, ShoppingCart, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import axios from "axios";
 import { useOrder } from "../contexts/useOrder";
 import { useTranslation } from "../utils/translations";
 import { Button } from "../Components/UI/Button";
@@ -12,76 +11,6 @@ import { Card, CardContent } from "../Components/UI/card";
 import { Badge } from "../Components/UI/badge";
 import BackButton from "../Components/BackButton/BackButton";
 
-const menuItems = [
-  {
-    id: "1",
-    name: "Classic Burger",
-    nameAr: "برجر كلاسيكي",
-    description:
-      "Juicy beef patty with lettuce, tomato, onion, and our special sauce",
-    descriptionAr: "قطعة لحم طرية مع خس وطماطم وبصل وصلصتنا الخاصة",
-    price: 25,
-    image:
-      "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop",
-    category: "Burgers",
-  },
-  {
-    id: "2",
-    name: "Chicken Caesar Salad",
-    nameAr: "سلطة سيزر بالدجاج",
-    description:
-      "Grilled chicken breast with romaine lettuce, parmesan, and caesar dressing",
-    descriptionAr: "صدر دجاج مشوي مع خس روماني وجبن بارميزان وصلصة سيزر",
-    price: 22,
-    image:
-      "https://images.unsplash.com/photo-1551248429-40975aa4de74?w=400&h=300&fit=crop",
-    category: "Salads",
-  },
-  {
-    id: "3",
-    name: "Margherita Pizza",
-    nameAr: "بيتزا مارغريتا",
-    description: "Fresh mozzarella, tomato sauce, and basil on thin crust",
-    descriptionAr: "موتزاريلا طازجة وصلصة طماطم وريحان على عجينة رقيقة",
-    price: 28,
-    image:
-      "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop",
-    category: "Pizza",
-  },
-  {
-    id: "4",
-    name: "Grilled Salmon",
-    nameAr: "سلمون مشوي",
-    description: "Atlantic salmon with lemon herbs and seasonal vegetables",
-    descriptionAr: "سلمون أطلسي بالأعشاب والليمون مع خضار موسمية",
-    price: 35,
-    image:
-      "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&h=300&fit=crop",
-    category: "Seafood",
-  },
-  {
-    id: "5",
-    name: "Chocolate Brownie",
-    nameAr: "براوني الشوكولاتة",
-    description: "Rich chocolate brownie served with vanilla ice cream",
-    descriptionAr: "براوني شوكولاتة غني يُقدم مع آيس كريم الفانيلا",
-    price: 15,
-    image:
-      "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=400&h=300&fit=crop",
-    category: "Desserts",
-  },
-  {
-    id: "6",
-    name: "Fresh Orange Juice",
-    nameAr: "عصير برتقال طازج",
-    description: "Freshly squeezed orange juice",
-    descriptionAr: "عصير برتقال طازج معصور",
-    price: 8,
-    image:
-      "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400&h=300&fit=crop",
-    category: "Beverages",
-  },
-];
 export interface Category {
   key:
     | "All"
@@ -90,7 +19,19 @@ export interface Category {
     | "Salads"
     | "Seafood"
     | "Desserts"
-    | "Beverages";
+    | "Beverages"
+    | "Sandwiches";
+}
+
+interface MenuItem {
+  id: string;
+  name: string;
+  nameAr: string;
+  description: string;
+  descriptionAr: string;
+  price: number;
+  image: string;
+  category: string;
 }
 
 const Menu = () => {
@@ -99,11 +40,93 @@ const Menu = () => {
   const t = useTranslation(order.language);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const categoryList: Category["key"][] = [
+    "All",
+    "Burgers",
+    "Sandwiches",
+    "Pizza",
+    "Salads",
+    "Seafood",
+    "Desserts",
+    "Beverages",
+  ];
+
+  // State to store all menu items fetched from API
+  const [allMenuItems, setAllMenuItems] = useState<MenuItem[]>([]);
+
+  // Fetch all menu items from API (only once)
+  const fetchAllMenuItems = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await axios.get(
+        "https://primary-production-c413.up.railway.app/webhook/get-menu"
+      );
+
+      if (response.data && Array.isArray(response.data)) {
+        setAllMenuItems(response.data);
+        setMenuItems(response.data); // Show all items initially
+      } else {
+        setAllMenuItems([]);
+        setMenuItems([]);
+        toast.error("No menu items found");
+      }
+    } catch (err) {
+      console.error("Error fetching menu items:", err);
+      setError("Failed to load menu items");
+      setAllMenuItems([]);
+      setMenuItems([]);
+      toast.error("Failed to load menu items");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter items based on selected category (client-side filtering)
+  const filterItemsByCategory = (category: string) => {
+    if (category === "All") {
+      setMenuItems(allMenuItems); // Show all items
+    } else {
+      // Filter items by category - handle both "Sandwich" and "Sandwiches"
+      const filteredItems = allMenuItems.filter((item) => {
+        const itemCategory = item.category.toLowerCase();
+        const selectedCat = category.toLowerCase();
+
+        // Handle both "sandwich" and "sandwiches"
+        if (selectedCat === "sandwiches" && itemCategory === "sandwich") {
+          return true;
+        }
+        if (selectedCat === "sandwich" && itemCategory === "sandwiches") {
+          return true;
+        }
+
+        return itemCategory === selectedCat;
+      });
+      setMenuItems(filteredItems);
+    }
+  };
+
+  // Handle category change (client-side filtering)
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    filterItemsByCategory(category);
+  };
+
+  // Load all menu items once on component mount
+  useEffect(() => {
+    fetchAllMenuItems();
+  }, []);
 
   // go back
   const handleBack = () => {
     navigate("/order-type");
   };
+
   // quantity
   const handleQuantityChange = (itemId: string, change: number) => {
     setQuantities((prev) => ({
@@ -112,7 +135,7 @@ const Menu = () => {
     }));
   };
 
-  const handleAddToOrder = (item: any) => {
+  const handleAddToOrder = (item: MenuItem) => {
     const quantity = quantities[item.id] || 1;
     const itemNotes = notes[item.id] || "";
 
@@ -147,18 +170,6 @@ const Menu = () => {
     }
     navigate("/summary");
   };
-  // Category selection
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
-
-  const categoryList: Category["key"][] = [
-    "All",
-    "Burgers",
-    "Pizza",
-    "Salads",
-    "Seafood",
-    "Desserts",
-    "Beverages",
-  ];
 
   return (
     <div
@@ -172,10 +183,9 @@ const Menu = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <BackButton onClick={handleBack} />
-
               <h1 className="text-2xl font-bold text-gray-900">{t.menu}</h1>
             </div>
-            {/* item button */}
+            {/* Cart button */}
             {order.items.length > 0 && (
               <Button
                 onClick={handleGoToSummary}
@@ -190,120 +200,156 @@ const Menu = () => {
         </div>
       </div>
 
-      {/* Category Filter */}
-      <div className="flex flex-wrap gap-2 justify-center mb-6 mt-6">
-        {categoryList.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-4 py-2 rounded-full text-sm font-medium border ${
-              selectedCategory === cat
-                ? "bg-orange-500 text-white border-orange-500"
-                : "bg-white text-gray-700 border-gray-300"
-            } transition-colors`}
-          >
-            {t.categories[cat]}
-          </button>
-        ))}
-      </div>
-      {/* Menu Items */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          {menuItems
-            .filter((item) =>
-              selectedCategory === "All"
-                ? true
-                : item.category === selectedCategory
-            )
-            .map((item) => (
-              <Card
-                key={item.id}
-                className="overflow-hidden hover:shadow-lg transition-shadow duration-200"
-              >
-                <div className="aspect-video overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={order.language === "ar" ? item.nameAr : item.name}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
-                  />
-                </div>
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                        {order.language === "ar" ? item.nameAr : item.name}
-                      </h3>
-                      <Badge variant="secondary" className="text-xs">
-                        {item.category}
-                      </Badge>
-                    </div>
-                    <span className="text-2xl font-bold text-orange-600">
-                      {t.price}
-                      {item.price}
-                    </span>
-                  </div>
-
-                  <p className="text-gray-600 mb-4 text-sm leading-relaxed">
-                    {order.language === "ar"
-                      ? item.descriptionAr
-                      : item.description}
-                  </p>
-
-                  {/* Quantity Selector */}
-                  <div className="flex items-center space-x-3 mb-4">
-                    <span className="text-sm font-medium text-gray-700">
-                      {t.quantity}:
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuantityChange(item.id, -1)}
-                        disabled={(quantities[item.id] || 1) <= 1}
-                      >
-                        <Minus className="w-3 h-3" />
-                      </Button>
-                      <span className="w-8 text-center font-medium">
-                        {quantities[item.id] || 1}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuantityChange(item.id, 1)}
-                      >
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Special Notes */}
-                  <div className="mb-4">
-                    <Input
-                      placeholder={t.specialNotes}
-                      value={notes[item.id] || ""}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setNotes((prev) => ({
-                          ...prev,
-                          [item.id]: e.target.value,
-                        }))
-                      }
-                      className="text-sm"
-                    />
-                  </div>
-
-                  {/* Add to Order Button */}
-                  <Button
-                    onClick={() => handleAddToOrder(item)}
-                    className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold"
-                  >
-                    {t.addToOrder} - {t.price}
-                    {item.price * (quantities[item.id] || 1)}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+      {/* Category Filter - Fixed */}
+      <div className="bg-white shadow-sm sticky top-[73px] z-9 py-4">
+        <div className="flex flex-wrap gap-2 justify-center px-4">
+          {categoryList.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => handleCategoryChange(cat)}
+              disabled={loading}
+              className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                selectedCategory === cat
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "bg-white text-gray-700 border-gray-300 hover:border-orange-300"
+              } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              {t.categories[cat] || cat}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+          <span className="ml-2 text-gray-600">Loading menu items...</span>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+            <p className="text-red-600">{error}</p>
+            <Button
+              onClick={() => fetchAllMenuItems()}
+              className="mt-2 bg-red-500 hover:bg-red-600 text-white"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Menu Items */}
+      {!loading && !error && (
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          {menuItems.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600 text-lg">
+                No items found for {selectedCategory}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2">
+              {menuItems.map((item) => (
+                <Card
+                  key={item.id}
+                  className="overflow-hidden hover:shadow-lg transition-shadow duration-200"
+                >
+                  <div className="aspect-video overflow-hidden">
+                    <img
+                      src={item.image}
+                      alt={order.language === "ar" ? item.nameAr : item.name}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
+                      onError={(e) => {
+                        // Fallback image if image fails to load
+                        (e.target as HTMLImageElement).src =
+                          "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&h=300&fit=crop";
+                      }}
+                    />
+                  </div>
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                          {order.language === "ar" ? item.nameAr : item.name}
+                        </h3>
+                        <Badge variant="secondary" className="text-xs">
+                          {item.category}
+                        </Badge>
+                      </div>
+                      <span className="text-2xl font-bold text-orange-600">
+                        {t.price}
+                        {item.price}
+                      </span>
+                    </div>
+
+                    <p className="text-gray-600 mb-4 text-sm leading-relaxed">
+                      {order.language === "ar"
+                        ? item.descriptionAr
+                        : item.description}
+                    </p>
+
+                    {/* Quantity Selector */}
+                    <div className="flex items-center space-x-3 mb-4">
+                      <span className="text-sm font-medium text-gray-700">
+                        {t.quantity}:
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleQuantityChange(item.id, -1)}
+                          disabled={(quantities[item.id] || 1) <= 1}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </Button>
+                        <span className="w-8 text-center font-medium">
+                          {quantities[item.id] || 1}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleQuantityChange(item.id, 1)}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Special Notes */}
+                    <div className="mb-4">
+                      <Input
+                        placeholder={t.specialNotes}
+                        value={notes[item.id] || ""}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setNotes((prev) => ({
+                            ...prev,
+                            [item.id]: e.target.value,
+                          }))
+                        }
+                        className="text-sm"
+                      />
+                    </div>
+
+                    {/* Add to Order Button */}
+                    <Button
+                      onClick={() => handleAddToOrder(item)}
+                      className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold"
+                    >
+                      {t.addToOrder} - {t.price}
+                      {item.price * (quantities[item.id] || 1)}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
