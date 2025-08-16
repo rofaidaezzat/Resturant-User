@@ -107,9 +107,13 @@ const OrderSummary = () => {
 
       // Send order to API
       const response = await axiosInstance.post("webhook/new-order", orderData);
-
+      const orderToStockResponse = await axiosInstance.post(
+        "webhook/order-to-stock",
+        orderData
+      );
       console.log("Full API Response:", response);
       console.log("Response data:", response.data);
+      console.log("Order to stock response:", orderToStockResponse.data);
 
       // Check if the response has the expected structure
       if (response.data && response.data.success && response.data.payload) {

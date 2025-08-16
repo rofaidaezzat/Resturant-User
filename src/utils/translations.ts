@@ -35,6 +35,7 @@ export const translations = {
     orderProcessing: "Your order is being processed",
     orderNumber: "Order Number",
     newOrder: "Start New Order",
+    cancel: "Cancel Order",
     
     // Chatbot
     chatbotTitle: "AI Assistant",
@@ -100,6 +101,7 @@ export const translations = {
     orderProcessing: "جاري تحضير طلبك",
     orderNumber: "رقم الطلب",
     newOrder: "طلب جديد",
+    cancel: "إلغاء الطلب",
     
     // Chatbot
     chatbotTitle: "المساعد الذكي",

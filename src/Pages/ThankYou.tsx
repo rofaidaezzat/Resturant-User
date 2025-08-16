@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ChefHat,
   Package,
+  X,
 } from "lucide-react";
 import { Button } from "../Components/UI/Button";
 import { useTranslation } from "../utils/translations";
@@ -30,9 +31,14 @@ const ThankYou = () => {
 
   // State for order status tracking with proper typing
   const [orderStatus, setOrderStatus] = useState<OrderStatus | null>(null);
-  const [statusLoading, setStatusLoading] = useState(false); // تغيير initial value لـ false
+  const [statusLoading, setStatusLoading] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // State for cancel functionality
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [orderCancelled, setOrderCancelled] = useState(false);
 
   // Function to fetch order status
   const fetchOrderStatus = async () => {
@@ -151,6 +157,114 @@ const ThankYou = () => {
     }
   };
 
+  // Function to cancel order
+  const handleCancelOrder = async () => {
+    console.log("=== handleCancelOrder Function Called ===");
+
+    // التحقق من وجود order_ID
+    if (!order?.order_ID) {
+      console.log("❌ No order ID available for cancellation");
+      setCancelError("Order ID not available");
+      return;
+    }
+
+    // تنظيف order_ID من المسافات
+    const cleanOrderId = order.order_ID.toString().trim();
+    console.log("Clean Order ID for cancellation:", cleanOrderId);
+
+    if (!cleanOrderId) {
+      console.log("❌ Order ID is empty after trimming");
+      setCancelError("Order ID is empty");
+      return;
+    }
+
+    // التحقق من حالة الطلب - لا يمكن إلغاء الطلبات المكتملة
+    if (orderStatus?.status === "completed") {
+      setCancelError("Cannot cancel completed orders");
+      return;
+    }
+
+    try {
+      setCancelLoading(true);
+      setCancelError(null);
+
+      console.log("🚀 Making cancel API request...");
+
+      // إعداد بيانات الإلغاء
+      const cancelData = {
+        orderId: cleanOrderId,
+        newStatus: "cancelled",
+      };
+
+      console.log("Cancel request data:", cancelData);
+      console.log("Request URL:", `/webhook/update-order`);
+
+      // إرسال طلب الإلغاء
+      const response = await axiosInstance.post(
+        `/webhook/update-order`,
+        cancelData
+      );
+
+      console.log("✅ Cancel request completed successfully!");
+      console.log("Response status:", response.status);
+      console.log("Response data:", response.data);
+
+      // التحقق من الاستجابة
+      if (response.status === 200 || response.status === 201) {
+        console.log("🎉 Order cancelled successfully!");
+        setOrderCancelled(true);
+
+        // تحديث حالة الطلب محلياً
+        setOrderStatus((prev) =>
+          prev ? { ...prev, status: "cancelled" } : null
+        );
+
+        // إظهار رسالة نجح وإعادة توجيه بعد 3 ثواني
+        setTimeout(() => {
+          clearOrder();
+          navigate("/");
+        }, 3000);
+      } else {
+        console.log("❌ Invalid response status");
+        setCancelError("Failed to cancel order");
+      }
+    } catch (error: any) {
+      console.log("=== Cancel API Request Error ===");
+      console.error("Full error object:", error);
+
+      if (error.response) {
+        console.error("❌ Server responded with error:");
+        console.error("Status:", error.response.status);
+        console.error("Headers:", error.response.headers);
+        console.error("Data:", error.response.data);
+
+        switch (error.response.status) {
+          case 404:
+            setCancelError("Order not found");
+            break;
+          case 400:
+            setCancelError("Cannot cancel this order");
+            break;
+          case 500:
+            setCancelError("Server error - please try again later");
+            break;
+          default:
+            setCancelError(`Server error: ${error.response.status}`);
+        }
+      } else if (error.request) {
+        console.error("❌ Network error - request was made but no response:");
+        setCancelError("Network error - check your connection");
+      } else {
+        console.error("❌ Error setting up request:");
+        console.error("Error message:", error.message);
+        setCancelError("Failed to cancel order");
+      }
+    } finally {
+      setCancelLoading(false);
+      console.log("🏁 handleCancelOrder completed");
+    }
+  };
+
   // useEffect للـ initial load والـ polling
   useEffect(() => {
     console.log("=== ThankYou Component useEffect Triggered ===");
@@ -190,10 +304,12 @@ const ThankYou = () => {
       fetchOrderStatus();
     }, 100);
 
-    // إعداد polling كل 30 ثانية
+    // إعداد polling كل 30 ثانية (فقط إذا لم يتم إلغاء الطلب)
     const interval = setInterval(() => {
-      console.log("⏰ Polling interval triggered");
-      fetchOrderStatus();
+      if (!orderCancelled) {
+        console.log("⏰ Polling interval triggered");
+        fetchOrderStatus();
+      }
     }, 30000);
 
     // تنظيف interval عند unmount أو تغيير order_ID
@@ -201,7 +317,7 @@ const ThankYou = () => {
       console.log("🧹 Cleaning up polling interval");
       clearInterval(interval);
     };
-  }, [order?.order_ID]);
+  }, [order?.order_ID, orderCancelled]);
 
   // Get status display info
   const getStatusInfo = (status: string) => {
@@ -255,6 +371,16 @@ const ThankYou = () => {
           borderColor: "border-emerald-200",
           progress: "100%",
         };
+      case "cancelled":
+        return {
+          icon: <X className="w-5 h-5 text-red-600" />,
+          text: "Cancelled",
+          description: "Order has been cancelled",
+          color: "text-red-600",
+          bgColor: "bg-red-50",
+          borderColor: "border-red-200",
+          progress: "0%",
+        };
       default:
         return {
           icon: <Clock className="w-5 h-5 text-gray-600" />,
@@ -275,12 +401,20 @@ const ThankYou = () => {
 
   const handleRefreshStatus = () => {
     console.log("Manual refresh triggered");
-    fetchOrderStatus();
+    if (!orderCancelled) {
+      fetchOrderStatus();
+    }
   };
 
   const statusInfo = orderStatus
     ? getStatusInfo(orderStatus.status)
     : getStatusInfo("processing");
+
+  // Check if order can be cancelled
+  const canCancelOrder =
+    orderStatus?.status !== "completed" &&
+    orderStatus?.status !== "cancelled" &&
+    !orderCancelled;
 
   return (
     <div
@@ -289,15 +423,32 @@ const ThankYou = () => {
       }`}
     >
       <div className="max-w-md w-full">
-        {/* Success Animation */}
+        {/* Success Animation or Cancellation Message */}
         <div className="text-center mb-8">
-          <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl animate-pulse">
-            <CheckCircle className="w-12 h-12 text-white" />
-          </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">
-            {t.thankYou}
-          </h1>
-          <p className="text-lg text-gray-600">{t.orderProcessing}</p>
+          {orderCancelled ? (
+            <>
+              <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl animate-pulse">
+                <X className="w-12 h-12 text-white" />
+              </div>
+              <h1 className="text-4xl font-bold text-red-600 mb-3">
+                Order Cancelled
+              </h1>
+              <p className="text-lg text-gray-600">
+                Your order has been successfully cancelled. Redirecting to
+                home...
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-2xl animate-pulse">
+                <CheckCircle className="w-12 h-12 text-white" />
+              </div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-3">
+                {t.thankYou}
+              </h1>
+              <p className="text-lg text-gray-600">{t.orderProcessing}</p>
+            </>
+          )}
         </div>
 
         {/* Order Details */}
@@ -344,52 +495,72 @@ const ThankYou = () => {
               </p>
 
               {/* Status Progress Bar */}
-              {!statusError && orderStatus && (
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-500`}
-                    style={{
-                      width: statusInfo.progress,
-                      backgroundColor: statusInfo.color.includes("amber")
-                        ? "#f59e0b"
-                        : statusInfo.color.includes("blue")
-                        ? "#3b82f6"
-                        : statusInfo.color.includes("green")
-                        ? "#10b981"
-                        : statusInfo.color.includes("emerald")
-                        ? "#059669"
-                        : "#6b7280",
-                    }}
-                  ></div>
-                </div>
-              )}
+              {!statusError &&
+                orderStatus &&
+                orderStatus.status !== "cancelled" && (
+                  <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-500`}
+                      style={{
+                        width: statusInfo.progress,
+                        backgroundColor: statusInfo.color.includes("amber")
+                          ? "#f59e0b"
+                          : statusInfo.color.includes("blue")
+                          ? "#3b82f6"
+                          : statusInfo.color.includes("green")
+                          ? "#10b981"
+                          : statusInfo.color.includes("emerald")
+                          ? "#059669"
+                          : "#6b7280",
+                      }}
+                    ></div>
+                  </div>
+                )}
 
               {/* Refresh Button and Last Updated */}
-              <div className="flex items-center justify-between text-xs text-gray-600 mt-3">
-                <button
-                  onClick={handleRefreshStatus}
-                  disabled={statusLoading}
-                  className="flex items-center space-x-1 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Loader2
-                    className={`w-3 h-3 ${statusLoading ? "animate-spin" : ""}`}
-                  />
-                  <span>Refresh</span>
-                </button>
-                {lastUpdated && (
-                  <span>Updated: {lastUpdated.toLocaleTimeString()}</span>
-                )}
-              </div>
+              {!orderCancelled && (
+                <div className="flex items-center justify-between text-xs text-gray-600 mt-3">
+                  <button
+                    onClick={handleRefreshStatus}
+                    disabled={statusLoading}
+                    className="flex items-center space-x-1 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Loader2
+                      className={`w-3 h-3 ${
+                        statusLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    <span>Refresh</span>
+                  </button>
+                  {lastUpdated && (
+                    <span>Updated: {lastUpdated.toLocaleTimeString()}</span>
+                  )}
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-center space-x-2 text-gray-600 mt-4">
-              <Clock className="w-4 h-4" />
-              <span className="text-sm">
-                Estimated preparation time: 15-20 minutes
-              </span>
-            </div>
+            {!orderCancelled && (
+              <div className="flex items-center justify-center space-x-2 text-gray-600 mt-4">
+                <Clock className="w-4 h-4" />
+                <span className="text-sm">
+                  Estimated preparation time: 15-20 minutes
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Cancel Error Display */}
+        {cancelError && (
+          <Card className="mb-4 shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2 text-red-600">
+                <AlertCircle className="w-5 h-5" />
+                <span className="text-sm font-medium">{cancelError}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Order Summary */}
         <Card className="mb-8 shadow-lg">
@@ -428,15 +599,51 @@ const ThankYou = () => {
         </Card>
 
         {/* Actions */}
-        <div className="space-y-3">
-          <Button
-            onClick={handleNewOrder}
-            className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold py-3"
-          >
-            <Home className="w-4 h-4 mr-2" />
-            {t.newOrder}
-          </Button>
-        </div>
+        {!orderCancelled && (
+          <div className="space-x-3 flex flex-col sm:flex-row space-y-3 sm:space-y-0">
+            <Button
+              onClick={handleCancelOrder}
+              disabled={cancelLoading || !canCancelOrder}
+              className={`w-full font-semibold py-3 ${
+                canCancelOrder
+                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              {cancelLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                <>
+                  <X className="w-4 h-4 mr-2" />
+                  {t.cancel}
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleNewOrder}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold py-3"
+            >
+              <Home className="w-4 h-4 mr-2" />
+              {t.newOrder}
+            </Button>
+          </div>
+        )}
+
+        {/* If order is cancelled, show only new order button */}
+        {orderCancelled && (
+          <div className="flex justify-center">
+            <Button
+              onClick={handleNewOrder}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold py-3"
+            >
+              <Home className="w-4 h-4 mr-2" />
+              {t.newOrder}
+            </Button>
+          </div>
+        )}
 
         {/* Decorative Elements */}
         <div className="absolute top-1/4 left-4 w-16 h-16 bg-green-200/30 rounded-full blur-xl" />

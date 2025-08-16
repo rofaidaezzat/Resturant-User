@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Minus, ShoppingCart, Loader2 } from "lucide-react";
+import { Plus, Minus, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 import { useOrder } from "../contexts/useOrder";
@@ -10,6 +10,7 @@ import { Input } from "../Components/UI/Input";
 import { Card, CardContent } from "../Components/UI/card";
 import { Badge } from "../Components/UI/badge";
 import BackButton from "../Components/BackButton/BackButton";
+import MenuSkeleton from "../Components/MenuSkeleton";
 
 export interface Category {
   key:
@@ -221,12 +222,7 @@ const Menu = () => {
       </div>
 
       {/* Loading State */}
-      {loading && (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-          <span className="ml-2 text-gray-600">Loading menu items...</span>
-        </div>
-      )}
+      {loading && <MenuSkeleton itemCount={6} />}
 
       {/* Error State */}
       {error && !loading && (
