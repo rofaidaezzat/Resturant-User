@@ -6,12 +6,29 @@ import { Button } from "../Components/UI/Button";
 import { Input } from "../Components/UI/Input";
 import { useTranslation } from "../utils/translations";
 import { axiosInstance } from "../config/axios.config";
-import { v4 as uuidv4 } from "uuid"; // لإنتاج sessionId فريد
+import { v4 as uuidv4 } from "uuid";
+import Pusher from "pusher-js";
+
+// =================== Pusher Configuration ===================
+const PUSHER_KEY = "4b8ce5bea9c546484b04";
+const PUSHER_CLUSTER = "eu";
+const CHANNEL_NAME = "new-orders";
+const EVENT_NAME = "order-created";
+const UPDATE_EVENT_NAME = "order-updated";
+
 interface Message {
   id: string;
   text: string;
   sender: "user" | "bot";
   timestamp: Date;
+}
+
+interface PusherOrderData {
+  orderId: string;
+  message: string;
+  sessionId: string;
+  timestamp: string;
+  // Add other order fields as needed
 }
 
 const Chatbot = () => {
@@ -29,7 +46,9 @@ const Chatbot = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const sessionIdRef = useRef(uuidv4()); // 🔐 يبقى ثابت طول الجلسة
+  const sessionIdRef = useRef(uuidv4());
+  const pusherRef = useRef<Pusher | null>(null);
+  const channelRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -39,6 +58,62 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
+  // =================== Pusher Setup ===================
+  useEffect(() => {
+    // Initialize Pusher
+    pusherRef.current = new Pusher(PUSHER_KEY, {
+      cluster: PUSHER_CLUSTER,
+      encrypted: true,
+    });
+
+    // Subscribe to the channel
+    channelRef.current = pusherRef.current.subscribe(CHANNEL_NAME);
+
+    // Listen for order created events
+    channelRef.current.bind(EVENT_NAME, (data: PusherOrderData) => {
+      console.log("Pusher order-created event:", data);
+
+      // Only process if it's for this session or if it's a general notification
+      if (data.sessionId === sessionIdRef.current || !data.sessionId) {
+        const newBotMessage: Message = {
+          id: Date.now().toString(),
+          text: data.message || "Your order has been created successfully!",
+          sender: "bot",
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, newBotMessage]);
+      }
+    });
+
+    // Listen for order update events
+    channelRef.current.bind(UPDATE_EVENT_NAME, (data: PusherOrderData) => {
+      console.log("Pusher order-updated event:", data);
+
+      if (data.sessionId === sessionIdRef.current || !data.sessionId) {
+        const newBotMessage: Message = {
+          id: Date.now().toString(),
+          text: data.message || "Your order has been updated!",
+          sender: "bot",
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, newBotMessage]);
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      if (channelRef.current) {
+        channelRef.current.unbind_all();
+        channelRef.current.unsubscribe();
+      }
+      if (pusherRef.current) {
+        pusherRef.current.disconnect();
+      }
+    };
+  }, []);
+
   const handleBack = () => {
     navigate("/order-type");
   };
@@ -47,11 +122,17 @@ const Chatbot = () => {
     setIsTyping(true);
 
     try {
-      // Try using the same payload structure as the working code
+      // Send the message with session ID for Pusher integration
       const response = await axiosInstance.post("webhook/chatbot", {
         message: userMessage,
-        timestamp: new Date().toISOString(), // Instead of sessionId
-        sessionId: sessionIdRef.current, // ✅ ثابت من أول الشات,
+        timestamp: new Date().toISOString(),
+        sessionId: sessionIdRef.current,
+        // Add additional data for Pusher workflow
+        pusherData: {
+          channel: CHANNEL_NAME,
+          event: EVENT_NAME,
+          sessionId: sessionIdRef.current,
+        },
       });
 
       console.log("Full bot response:", response.data);
@@ -60,19 +141,14 @@ const Chatbot = () => {
       let botText;
 
       if (typeof response.data === "string") {
-        // Plain text response (like first code)
         botText = response.data;
       } else if (response.data?.[0]?.output) {
-        // Array with output property
         botText = response.data[0].output;
       } else if (response.data?.output) {
-        // Direct output property
         botText = response.data.output;
       } else if (response.data?.message) {
-        // Message property
         botText = response.data.message;
       } else {
-        // Fallback - try to stringify if it's an object
         botText =
           typeof response.data === "object"
             ? JSON.stringify(response.data)
@@ -123,6 +199,12 @@ const Chatbot = () => {
     }
   };
 
+  // =================== Quick Action Handlers ===================
+  const handleQuickAction = (message: string) => {
+    setInputMessage(message);
+    setTimeout(() => handleSendMessage(), 100); // Small delay to ensure state is updated
+  };
+
   return (
     <div
       className={`min-h-screen bg-gray-50 ${
@@ -148,6 +230,21 @@ const Chatbot = () => {
               <h1 className="text-2xl font-bold text-gray-900">
                 {t.chatbotTitle}
               </h1>
+              {/* Connection Status Indicator */}
+              <div className="ml-3 flex items-center">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    pusherRef.current?.connection.state === "connected"
+                      ? "bg-green-500"
+                      : "bg-red-500"
+                  }`}
+                />
+                <span className="ml-1 text-xs text-gray-500">
+                  {pusherRef.current?.connection.state === "connected"
+                    ? "Live"
+                    : "Offline"}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -192,6 +289,9 @@ const Chatbot = () => {
                     }`}
                   >
                     <p className="text-sm">{message.text}</p>
+                    <span className="text-xs opacity-70 mt-1 block">
+                      {message.timestamp.toLocaleTimeString()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -260,10 +360,9 @@ const Chatbot = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setInputMessage("What are your most popular dishes?");
-                handleSendMessage();
-              }}
+              onClick={() =>
+                handleQuickAction("What are your most popular dishes?")
+              }
               className="text-sm"
             >
               Popular Items
@@ -271,16 +370,43 @@ const Chatbot = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setInputMessage("Do you have vegetarian options?");
-                handleSendMessage();
-              }}
+              onClick={() =>
+                handleQuickAction("Do you have vegetarian options?")
+              }
               className="text-sm"
             >
               Vegetarian Options
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuickAction("What are your delivery times?")}
+              className="text-sm"
+            >
+              Delivery Info
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuickAction("Check my order status")}
+              className="text-sm"
+            >
+              Order Status
+            </Button>
           </div>
         </div>
+
+        {/* Debug Info (Remove in production) */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
+            <p>
+              <strong>Debug Info:</strong>
+            </p>
+            <p>Session ID: {sessionIdRef.current}</p>
+            <p>Pusher State: {pusherRef.current?.connection.state}</p>
+            <p>Channel: {CHANNEL_NAME}</p>
+          </div>
+        )}
       </div>
     </div>
   );
