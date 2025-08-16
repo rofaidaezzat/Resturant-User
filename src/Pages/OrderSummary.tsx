@@ -23,6 +23,7 @@ import {
 } from "../Components/UI/card";
 import BackButton from "../Components/BackButton/BackButton";
 import { axiosInstance } from "../config/axios.config";
+import ConfirmationModal from "../Components/UI/ConfirmationModal";
 
 const OrderSummary = () => {
   const navigate = useNavigate();
@@ -30,6 +31,7 @@ const OrderSummary = () => {
   const t = useTranslation(order.language);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
   // Save order to sessionStorage whenever order changes
   useEffect(() => {
@@ -79,7 +81,12 @@ const OrderSummary = () => {
     }
   };
 
-  const handleConfirmOrder = async () => {
+  const handleConfirmOrder = () => {
+    setShowConfirmationModal(true);
+  };
+
+  const handleConfirmOrderSubmit = async () => {
+    setShowConfirmationModal(false);
     setIsSubmitting(true);
 
     try {
@@ -370,6 +377,19 @@ const OrderSummary = () => {
           </Button>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmationModal}
+        onClose={() => setShowConfirmationModal(false)}
+        onConfirm={handleConfirmOrderSubmit}
+        title={t.confirmOrder || "Confirm Order"}
+        message="Are you sure you want to confirm this order? This action cannot be undone."
+        confirmText="Yes, Confirm Order"
+        cancelText="Cancel"
+        type="warning"
+        isLoading={isSubmitting}
+      />
     </div>
   );
 };
