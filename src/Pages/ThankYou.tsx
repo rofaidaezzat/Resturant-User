@@ -193,7 +193,7 @@ const ThankYou = () => {
       // إعداد بيانات الإلغاء
       const cancelData = {
         orderId: cleanOrderId,
-        newStatus: "cancelled",
+        status: "cancelled",
       };
 
       console.log("Cancel request data:", cancelData);
