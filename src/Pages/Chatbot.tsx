@@ -63,7 +63,7 @@ const Chatbot = () => {
     // Initialize Pusher
     pusherRef.current = new Pusher(PUSHER_KEY, {
       cluster: PUSHER_CLUSTER,
-      encrypted: true,
+      forceTLS: true,
     });
 
     // Subscribe to the channel
